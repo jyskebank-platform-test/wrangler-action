@@ -1,11 +1,11 @@
 import {
 	getInput,
 	getMultilineInput,
-	info,
 	setFailed,
-	endGroup,
-	startGroup,
-	error,
+	info as originalInfo,
+	error as originalError,
+	endGroup as originalEndGroup,
+	startGroup as originalStartGroup,
 } from "@actions/core";
 import { execSync, exec } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -27,10 +27,35 @@ const config = {
 	ENVIRONMENT: getInput("environment"),
 	VARS: getMultilineInput("vars"),
 	COMMANDS: getMultilineInput("command"),
+	QUIET_MODE: getInput("quiet"),
 } as const;
 
 function getNpxCmd() {
 	return process.env.RUNNER_OS === "Windows" ? "npx.cmd" : "npx";
+}
+
+function info(message: string, bypass?: boolean): void {
+	if (!Boolean(config.QUIET_MODE) || bypass) {
+		originalInfo(message);
+	}
+}
+
+function error(message: string): void {
+	if (!Boolean(config.QUIET_MODE)) {
+		originalError(message);
+	}
+}
+
+function startGroup(name: string): void {
+	if (!Boolean(config.QUIET_MODE)) {
+		originalStartGroup(name);
+	}
+}
+
+function endGroup(): void {
+	if (!Boolean(config.QUIET_MODE)) {
+		originalEndGroup();
+	}
 }
 
 /**
@@ -60,6 +85,7 @@ async function main() {
 	await uploadSecrets();
 	await wranglerCommands();
 	await execCommands(getMultilineInput("postCommands"), "post");
+	info("🏁 Wrangler Action completed", true);
 }
 
 async function runProcess(
@@ -105,7 +131,7 @@ function installWrangler() {
 	const command = `npm install wrangler@${config["WRANGLER_VERSION"]}`;
 	info(`Running command: ${command}`);
 	execSync(command, { cwd: config["workingDirectory"], env: process.env });
-	info(`✅ Wrangler installed`);
+	info(`✅ Wrangler installed`, true);
 	endGroup();
 }
 
